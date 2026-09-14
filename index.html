@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>住院病人預計出院追蹤系統</title>
-<script type="text/javascript" src="https://gc.kes.v2.scr.kaspersky-labs.com/7EA5E9BB-55E1-4C31-9C21-4943DDFED2E4/main.js?attr=RQJhQpSlXPV_IKOUe3LLy9q3biI3Ke_iKG2x7zfeSeDLkZ_ZKvVOdWrnV2LcAuHYes3wBZ7EdaM2nhExCujWqjXsdeKGlpQjmy4u6W41e4Ky9LZZXGRBR_rLdrrVlnQFzpByFseIF_N_NoznODpV8IxcJq3Zv_Y_u1ziM1EDOc_r6TVn7hdInqm-3lIBAPpqER6JVRmHD5QcAmMP9Y1OaPces4tJAHzmF6D36IFmu4WzWQ2W9a3VZEf6kmyvN2abwKwh3Ivi_47PhrrhFn3lxcmv2A-qJXCnQgAps3_9kmvqP0Unwh6HdxSUbtp07Vue" charset="UTF-8"></script><style>
+<style>
   :root{
     --bg:#f6f7fb;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#e5e7eb;
     --danger:#dc2626;--warn:#d97706;--notice:#ca8a04;--ok:#16a34a;--primary:#2563eb;
@@ -152,7 +152,7 @@ function editCase(id){const c=cases.find(x=>x.id===id);if(!c)return;
   caseDialog.showModal();
 }
 function saveCase(e){e.preventDefault();const editId=document.getElementById('editId').value;
-  const c={id:editId||crypto.randomUUID(),studyId:studyId.value.trim(),group:group.value,ward:ward.value.trim(),enrollDate:enrollDate.value,expectedDischarge:expectedDischarge.value,actualDischarge:actualDischarge.value,t2DueDate:addDaysToDate(enrollDate.value,7),t2:t2.value,status:status.value,destination:destination.value,note:note.value.trim()};
+  const c={id:editId||crypto.randomUUID(),studyId:studyId.value.trim(),group:group.value,ward:ward.value.trim(),enrollDate:enrollDate.value,expectedDischarge:expectedDischarge.value,actualDischarge:actualDischarge.value,t2DueDate:addDaysToDate(enrollDate.value,7),t2:t2.value,status:document.getElementById('status').value,destination:destination.value,note:note.value.trim()};
   if(editId){cases=cases.map(x=>x.id===editId?c:x)}else{cases.push(c)} save();caseDialog.close();
 }
 function deleteCase(id){if(confirm('確定刪除此個案？')){cases=cases.filter(x=>x.id!==id);save()}}
