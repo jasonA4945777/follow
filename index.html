@@ -104,6 +104,12 @@
       <div class="card"><div class="label">今日排除</div><div class="metric" id="sExcluded">0</div></div>
     </div>
 
+    <div class="grid">
+      <div class="card"><div class="label">累計篩選總數</div><div class="metric" id="sTotal">0</div></div>
+      <div class="card"><div class="label">累計收案</div><div class="metric" id="sTotalEnrolled">0</div></div>
+      <div class="card"><div class="label">累計排除</div><div class="metric" id="sTotalExcluded">0</div></div>
+    </div>
+
     <div class="card">
       <div class="section-title">
         <h2>篩選記錄</h2>
@@ -116,7 +122,7 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>日期</th><th>結果</th><th>Study ID</th><th>病房</th><th>備註</th><th>操作</th>
+            <th>日期</th><th>結果</th><th>病房</th><th>備註</th><th>操作</th>
           </tr></thead>
           <tbody id="screenTbody"></tbody>
         </table>
@@ -132,7 +138,6 @@
       <input type="hidden" id="screenEditId">
       <label>日期<input id="screenDate" type="date" required></label>
       <label>結果<select id="screenOutcome"><option value="收案">收案</option><option value="排除">排除</option></select></label>
-      <label>Study ID（收案時填寫）<input id="screenStudyId" placeholder="例如 E001"></label>
       <label>病房<input id="screenWard" placeholder="例如 13W"></label>
       <label class="full">備註／排除原因<textarea id="screenNote" rows="2" placeholder="例如：不符合收案條件、拒絕參加"></textarea></label>
     </div>
@@ -186,11 +191,11 @@ function openAddScreen(){
 function editScreen(id){const s=screenings.find(x=>x.id===id);if(!s)return;
   document.getElementById('screenModalTitle').textContent='編輯篩選記錄';document.getElementById('screenEditId').value=s.id;
   screenDate.value=s.date||'';document.getElementById('screenOutcome').value=s.outcome||'收案';
-  screenStudyId.value=s.studyId||'';screenWard.value=s.ward||'';screenNote.value=s.note||'';
+  screenWard.value=s.ward||'';screenNote.value=s.note||'';
   screenDialog.showModal();
 }
 function saveScreen(e){e.preventDefault();const editId=document.getElementById('screenEditId').value;
-  const s={id:editId||crypto.randomUUID(),date:screenDate.value,outcome:document.getElementById('screenOutcome').value,studyId:screenStudyId.value.trim(),ward:screenWard.value.trim(),note:screenNote.value.trim()};
+  const s={id:editId||crypto.randomUUID(),date:screenDate.value,outcome:document.getElementById('screenOutcome').value,ward:screenWard.value.trim(),note:screenNote.value.trim()};
   if(editId){screenings=screenings.map(x=>x.id===editId?s:x)}else{screenings.push(s)} saveScreenings();screenDialog.close();
 }
 function deleteScreen(id){if(confirm('確定刪除此篩選記錄？')){screenings=screenings.filter(x=>x.id!==id);saveScreenings()}}
@@ -201,13 +206,17 @@ function renderScreening(){
   sEnrolled.textContent=todays.filter(s=>s.outcome==='收案').length;
   sExcluded.textContent=todays.filter(s=>s.outcome==='排除').length;
 
+  sTotal.textContent=screenings.length;
+  sTotalEnrolled.textContent=screenings.filter(s=>s.outcome==='收案').length;
+  sTotalExcluded.textContent=screenings.filter(s=>s.outcome==='排除').length;
+
   const filterDate=document.getElementById('screenDateFilter').value;
   const rows=screenings.filter(s=>!filterDate||s.date===filterDate).sort((a,b)=>b.date.localeCompare(a.date));
   screenTbody.innerHTML=rows.map(s=>`<tr>
     <td>${esc(s.date)}</td><td><span class="badge ${s.outcome==='收案'?'ok':'neutral'}">${esc(s.outcome)}</span></td>
-    <td>${esc(s.studyId||'—')}</td><td>${esc(s.ward||'—')}</td><td>${esc(s.note||'—')}</td>
+    <td>${esc(s.ward||'—')}</td><td>${esc(s.note||'—')}</td>
     <td><div class="actions"><button class="ghost small" onclick="editScreen('${s.id}')">編輯</button><button class="ghost small" onclick="deleteScreen('${s.id}')">刪除</button></div></td>
-  </tr>`).join('')||'<tr><td colspan="6" class="muted">目前沒有篩選記錄</td></tr>';
+  </tr>`).join('')||'<tr><td colspan="5" class="muted">目前沒有篩選記錄</td></tr>';
 }
 document.getElementById('screenDateFilter').addEventListener('change',renderScreening);
 
