@@ -42,6 +42,9 @@
   .actions{display:flex;gap:6px}.small{padding:6px 9px;font-size:12px}
   @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.modal-body{grid-template-columns:1fr}}
   @media(max-width:560px){.wrap{padding:14px}.grid{grid-template-columns:1fr}.priority-item{align-items:flex-start;flex-direction:column}}
+  .tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border)}
+  .tab-btn{background:transparent;border:0;border-bottom:3px solid transparent;border-radius:0;padding:10px 16px;font-weight:600;color:var(--muted);cursor:pointer}
+  .tab-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
 </style>
 </head>
 <body>
@@ -49,44 +52,93 @@
   <h1>住院病人預計出院追蹤系統</h1>
   <div class="sub">T1 完成後個案追蹤｜以 T2 日期為主要提醒，建議僅使用 Study ID，不輸入可識別資訊</div>
 
-  <div class="grid">
-    <div class="card"><div class="label">目前追蹤中</div><div class="metric" id="mTracking">0</div></div>
-    <div class="card"><div class="label">T2 尚未完成</div><div class="metric" id="mT2">0</div></div>
-    <div class="card"><div class="label">T2 3日內到期</div><div class="metric" id="mT2Soon">0</div></div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBtnTracking" onclick="switchTab('tracking')">個案追蹤</button>
+    <button class="tab-btn" id="tabBtnScreening" onclick="switchTab('screening')">篩選記錄</button>
   </div>
 
-  <div class="card priority">
-    <div class="section-title"><h2>今日優先追蹤</h2><span class="muted">T2 已到期或 3 日內到期且尚未完成者自動置頂</span></div>
-    <div id="priorityList" class="priority-list"></div>
-  </div>
+  <div id="tabTracking">
+    <div class="grid">
+      <div class="card"><div class="label">目前追蹤中</div><div class="metric" id="mTracking">0</div></div>
+      <div class="card"><div class="label">T2 尚未完成</div><div class="metric" id="mT2">0</div></div>
+      <div class="card"><div class="label">T2 3日內到期</div><div class="metric" id="mT2Soon">0</div></div>
+    </div>
 
-  <div class="card">
-    <div class="section-title">
-      <h2>全部個案</h2>
+    <div class="card priority">
+      <div class="section-title"><h2>今日優先追蹤</h2><span class="muted">T2 已到期或 3 日內到期且尚未完成者自動置頂</span></div>
+      <div id="priorityList" class="priority-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">
+        <h2>全部個案</h2>
+        <div class="toolbar">
+          <button class="primary" onclick="openAdd()">＋ 新增個案</button>
+          <button class="secondary" onclick="exportData()">匯出備份</button>
+          <label class="btn ghost">匯入備份<input id="importFile" type="file" accept="application/json" hidden onchange="importData(event)"></label>
+        </div>
+      </div>
+
       <div class="toolbar">
-        <button class="primary" onclick="openAdd()">＋ 新增個案</button>
-        <button class="secondary" onclick="exportData()">匯出備份</button>
-        <label class="btn ghost">匯入備份<input id="importFile" type="file" accept="application/json" hidden onchange="importData(event)"></label>
+        <input id="search" placeholder="搜尋 Study ID / 病房" oninput="render()" style="max-width:240px">
+        <select id="filterGroup" onchange="render()" style="max-width:160px"><option value="">全部組別</option><option>實驗組</option><option>對照組</option></select>
+        <select id="filterStatus" onchange="if(this.value==='已完成研究') document.getElementById('showCompleted').checked=true; render()" style="max-width:200px"><option value="">全部狀態</option><option>追蹤中</option><option>等待T2</option><option>預計出院</option><option>已完成研究</option><option>提前出院</option><option>退出研究</option></select>
+        <label class="btn ghost" style="display:flex;align-items:center;gap:8px"><input id="showCompleted" type="checkbox" onchange="render()" style="width:auto">顯示已完成（<span id="completedCount">0</span>）</label>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Study ID</th><th>組別</th><th>病房</th><th>收案日</th><th>預計出院</th><th>T2預計日</th><th>T2倒數</th><th>T2</th><th>研究狀態</th><th>操作</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
       </div>
     </div>
+  </div>
 
-    <div class="toolbar">
-      <input id="search" placeholder="搜尋 Study ID / 病房" oninput="render()" style="max-width:240px">
-      <select id="filterGroup" onchange="render()" style="max-width:160px"><option value="">全部組別</option><option>實驗組</option><option>對照組</option></select>
-      <select id="filterStatus" onchange="if(this.value==='已完成研究') document.getElementById('showCompleted').checked=true; render()" style="max-width:200px"><option value="">全部狀態</option><option>追蹤中</option><option>等待T2</option><option>預計出院</option><option>已完成研究</option><option>提前出院</option><option>退出研究</option></select>
-      <label class="btn ghost" style="display:flex;align-items:center;gap:8px"><input id="showCompleted" type="checkbox" onchange="render()" style="width:auto">顯示已完成（<span id="completedCount">0</span>）</label>
+  <div id="tabScreening" hidden>
+    <div class="grid">
+      <div class="card"><div class="label">今日篩選人數</div><div class="metric" id="sToday">0</div></div>
+      <div class="card"><div class="label">今日收案</div><div class="metric" id="sEnrolled">0</div></div>
+      <div class="card"><div class="label">今日排除</div><div class="metric" id="sExcluded">0</div></div>
     </div>
 
-    <div class="table-wrap">
-      <table>
-        <thead><tr>
-          <th>Study ID</th><th>組別</th><th>病房</th><th>收案日</th><th>預計出院</th><th>T2預計日</th><th>T2倒數</th><th>T2</th><th>研究狀態</th><th>操作</th>
-        </tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
+    <div class="card">
+      <div class="section-title">
+        <h2>篩選記錄</h2>
+        <div class="toolbar">
+          <input id="screenDateFilter" type="date" style="max-width:170px">
+          <button class="primary" onclick="openAddScreen()">＋ 新增篩選記錄</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>日期</th><th>結果</th><th>Study ID</th><th>病房</th><th>備註</th><th>操作</th>
+          </tr></thead>
+          <tbody id="screenTbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
+
+<dialog id="screenDialog">
+  <form method="dialog" id="screenForm" onsubmit="saveScreen(event)">
+    <div class="modal-head"><strong id="screenModalTitle">新增篩選記錄</strong><button type="button" class="ghost small" onclick="screenDialog.close()">關閉</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="screenEditId">
+      <label>日期<input id="screenDate" type="date" required></label>
+      <label>結果<select id="screenOutcome"><option value="收案">收案</option><option value="排除">排除</option></select></label>
+      <label>Study ID（收案時填寫）<input id="screenStudyId" placeholder="例如 E001"></label>
+      <label>病房<input id="screenWard" placeholder="例如 13W"></label>
+      <label class="full">備註／排除原因<textarea id="screenNote" rows="2" placeholder="例如：不符合收案條件、拒絕參加"></textarea></label>
+    </div>
+    <div class="modal-foot"><button type="button" class="ghost" onclick="screenDialog.close()">取消</button><button class="primary" type="submit">儲存</button></div>
+  </form>
+</dialog>
 
 <dialog id="caseDialog">
   <form method="dialog" id="caseForm" onsubmit="saveCase(event)">
@@ -113,6 +165,51 @@
 const KEY='discharge_tracker_cases_v1';
 let cases=JSON.parse(localStorage.getItem(KEY)||'[]');
 const caseDialog=document.getElementById('caseDialog');
+const SKEY='discharge_tracker_screening_v1';
+let screenings=JSON.parse(localStorage.getItem(SKEY)||'[]');
+const screenDialog=document.getElementById('screenDialog');
+
+function switchTab(name){
+  const isTracking=name==='tracking';
+  document.getElementById('tabTracking').hidden=!isTracking;
+  document.getElementById('tabScreening').hidden=isTracking;
+  document.getElementById('tabBtnTracking').classList.toggle('active',isTracking);
+  document.getElementById('tabBtnScreening').classList.toggle('active',!isTracking);
+  if(!isTracking) renderScreening();
+}
+function saveScreenings(){localStorage.setItem(SKEY,JSON.stringify(screenings));renderScreening()}
+function openAddScreen(){
+  document.getElementById('screenModalTitle').textContent='新增篩選記錄';
+  document.getElementById('screenForm').reset();document.getElementById('screenEditId').value='';
+  screenDate.value=new Date().toISOString().slice(0,10);screenDialog.showModal();
+}
+function editScreen(id){const s=screenings.find(x=>x.id===id);if(!s)return;
+  document.getElementById('screenModalTitle').textContent='編輯篩選記錄';document.getElementById('screenEditId').value=s.id;
+  screenDate.value=s.date||'';document.getElementById('screenOutcome').value=s.outcome||'收案';
+  screenStudyId.value=s.studyId||'';screenWard.value=s.ward||'';screenNote.value=s.note||'';
+  screenDialog.showModal();
+}
+function saveScreen(e){e.preventDefault();const editId=document.getElementById('screenEditId').value;
+  const s={id:editId||crypto.randomUUID(),date:screenDate.value,outcome:document.getElementById('screenOutcome').value,studyId:screenStudyId.value.trim(),ward:screenWard.value.trim(),note:screenNote.value.trim()};
+  if(editId){screenings=screenings.map(x=>x.id===editId?s:x)}else{screenings.push(s)} saveScreenings();screenDialog.close();
+}
+function deleteScreen(id){if(confirm('確定刪除此篩選記錄？')){screenings=screenings.filter(x=>x.id!==id);saveScreenings()}}
+function renderScreening(){
+  const today=new Date().toISOString().slice(0,10);
+  const todays=screenings.filter(s=>s.date===today);
+  sToday.textContent=todays.length;
+  sEnrolled.textContent=todays.filter(s=>s.outcome==='收案').length;
+  sExcluded.textContent=todays.filter(s=>s.outcome==='排除').length;
+
+  const filterDate=document.getElementById('screenDateFilter').value;
+  const rows=screenings.filter(s=>!filterDate||s.date===filterDate).sort((a,b)=>b.date.localeCompare(a.date));
+  screenTbody.innerHTML=rows.map(s=>`<tr>
+    <td>${esc(s.date)}</td><td><span class="badge ${s.outcome==='收案'?'ok':'neutral'}">${esc(s.outcome)}</span></td>
+    <td>${esc(s.studyId||'—')}</td><td>${esc(s.ward||'—')}</td><td>${esc(s.note||'—')}</td>
+    <td><div class="actions"><button class="ghost small" onclick="editScreen('${s.id}')">編輯</button><button class="ghost small" onclick="deleteScreen('${s.id}')">刪除</button></div></td>
+  </tr>`).join('')||'<tr><td colspan="6" class="muted">目前沒有篩選記錄</td></tr>';
+}
+document.getElementById('screenDateFilter').addEventListener('change',renderScreening);
 
 function dateOnly(d){const x=new Date(d);return new Date(x.getFullYear(),x.getMonth(),x.getDate())}
 function daysUntil(s){if(!s)return null;const today=dateOnly(new Date());const target=dateOnly(s+'T00:00:00');return Math.round((target-today)/86400000)}
