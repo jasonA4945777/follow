@@ -99,24 +99,25 @@
 
   <div id="tabScreening" hidden>
     <div class="grid">
-      <div class="card"><div class="label">今日篩選人數</div><div class="metric" id="sToday">0</div></div>
-      <div class="card"><div class="label">今日收案</div><div class="metric" id="sEnrolled">0</div></div>
-      <div class="card"><div class="label">今日排除</div><div class="metric" id="sExcluded">0</div></div>
+      <div class="card"><div class="label">累計篩選總數</div><div class="metric" id="sTotal">0</div></div>
+      <div class="card"><div class="label">累計收案</div><div class="metric" id="sTotalEnrolled">0</div></div>
+      <div class="card"><div class="label">累計排除</div><div class="metric" id="sTotalExcluded">0</div></div>
     </div>
 
     <div class="card">
-      <div class="section-title">
-        <h2>篩選記錄</h2>
-        <div class="toolbar">
-          <input id="screenDateFilter" type="date" style="max-width:170px">
-          <button class="primary" onclick="openAddScreen()">＋ 新增篩選記錄</button>
-        </div>
+      <div class="section-title"><h2>每日篩選數量</h2><span class="muted">同一天再次儲存會直接更新該天的數字</span></div>
+      <div class="toolbar">
+        <label style="max-width:170px">日期<input id="screenDate" type="date"></label>
+        <label style="max-width:140px">今日篩選總數<input id="screenTotalInput" type="number" min="0" placeholder="0"></label>
+        <label style="max-width:140px">收案人數<input id="screenEnrolledInput" type="number" min="0" placeholder="0"></label>
+        <label style="max-width:140px">排除人數<input id="screenExcludedInput" type="number" min="0" placeholder="0"></label>
+        <button class="primary" onclick="saveScreenDay()">儲存</button>
       </div>
 
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>日期</th><th>結果</th><th>Study ID</th><th>病房</th><th>備註</th><th>操作</th>
+            <th>日期</th><th>篩選總數</th><th>收案</th><th>排除</th><th>操作</th>
           </tr></thead>
           <tbody id="screenTbody"></tbody>
         </table>
@@ -124,21 +125,6 @@
     </div>
   </div>
 </div>
-
-<dialog id="screenDialog">
-  <form method="dialog" id="screenForm" onsubmit="saveScreen(event)">
-    <div class="modal-head"><strong id="screenModalTitle">新增篩選記錄</strong><button type="button" class="ghost small" onclick="screenDialog.close()">關閉</button></div>
-    <div class="modal-body">
-      <input type="hidden" id="screenEditId">
-      <label>日期<input id="screenDate" type="date" required></label>
-      <label>結果<select id="screenOutcome"><option value="收案">收案</option><option value="排除">排除</option></select></label>
-      <label>Study ID（收案時填寫）<input id="screenStudyId" placeholder="例如 E001"></label>
-      <label>病房<input id="screenWard" placeholder="例如 13W"></label>
-      <label class="full">備註／排除原因<textarea id="screenNote" rows="2" placeholder="例如：不符合收案條件、拒絕參加"></textarea></label>
-    </div>
-    <div class="modal-foot"><button type="button" class="ghost" onclick="screenDialog.close()">取消</button><button class="primary" type="submit">儲存</button></div>
-  </form>
-</dialog>
 
 <dialog id="caseDialog">
   <form method="dialog" id="caseForm" onsubmit="saveCase(event)">
@@ -167,7 +153,6 @@ let cases=JSON.parse(localStorage.getItem(KEY)||'[]');
 const caseDialog=document.getElementById('caseDialog');
 const SKEY='discharge_tracker_screening_v1';
 let screenings=JSON.parse(localStorage.getItem(SKEY)||'[]');
-const screenDialog=document.getElementById('screenDialog');
 
 function switchTab(name){
   const isTracking=name==='tracking';
@@ -175,41 +160,37 @@ function switchTab(name){
   document.getElementById('tabScreening').hidden=isTracking;
   document.getElementById('tabBtnTracking').classList.toggle('active',isTracking);
   document.getElementById('tabBtnScreening').classList.toggle('active',!isTracking);
-  if(!isTracking) renderScreening();
+  if(!isTracking){
+    if(!screenDate.value) screenDate.value=new Date().toISOString().slice(0,10);
+    renderScreening();
+  }
 }
 function saveScreenings(){localStorage.setItem(SKEY,JSON.stringify(screenings));renderScreening()}
-function openAddScreen(){
-  document.getElementById('screenModalTitle').textContent='新增篩選記錄';
-  document.getElementById('screenForm').reset();document.getElementById('screenEditId').value='';
-  screenDate.value=new Date().toISOString().slice(0,10);screenDialog.showModal();
+function saveScreenDay(){
+  const date=screenDate.value;
+  if(!date){alert('請選擇日期');return}
+  const day={date,total:Number(screenTotalInput.value)||0,enrolled:Number(screenEnrolledInput.value)||0,excluded:Number(screenExcludedInput.value)||0};
+  const existing=screenings.find(x=>x.date===date);
+  if(existing){screenings=screenings.map(x=>x.date===date?{...x,...day}:x)}else{screenings.push({id:crypto.randomUUID(),...day})}
+  saveScreenings();
+  screenTotalInput.value='';screenEnrolledInput.value='';screenExcludedInput.value='';
 }
-function editScreen(id){const s=screenings.find(x=>x.id===id);if(!s)return;
-  document.getElementById('screenModalTitle').textContent='編輯篩選記錄';document.getElementById('screenEditId').value=s.id;
-  screenDate.value=s.date||'';document.getElementById('screenOutcome').value=s.outcome||'收案';
-  screenStudyId.value=s.studyId||'';screenWard.value=s.ward||'';screenNote.value=s.note||'';
-  screenDialog.showModal();
+function editScreenDay(date){
+  const s=screenings.find(x=>x.date===date);if(!s)return;
+  screenDate.value=s.date;screenTotalInput.value=s.total;screenEnrolledInput.value=s.enrolled;screenExcludedInput.value=s.excluded;
 }
-function saveScreen(e){e.preventDefault();const editId=document.getElementById('screenEditId').value;
-  const s={id:editId||crypto.randomUUID(),date:screenDate.value,outcome:document.getElementById('screenOutcome').value,studyId:screenStudyId.value.trim(),ward:screenWard.value.trim(),note:screenNote.value.trim()};
-  if(editId){screenings=screenings.map(x=>x.id===editId?s:x)}else{screenings.push(s)} saveScreenings();screenDialog.close();
-}
-function deleteScreen(id){if(confirm('確定刪除此篩選記錄？')){screenings=screenings.filter(x=>x.id!==id);saveScreenings()}}
+function deleteScreenDay(date){if(confirm('確定刪除 '+date+' 的篩選記錄？')){screenings=screenings.filter(x=>x.date!==date);saveScreenings()}}
 function renderScreening(){
-  const today=new Date().toISOString().slice(0,10);
-  const todays=screenings.filter(s=>s.date===today);
-  sToday.textContent=todays.length;
-  sEnrolled.textContent=todays.filter(s=>s.outcome==='收案').length;
-  sExcluded.textContent=todays.filter(s=>s.outcome==='排除').length;
+  sTotal.textContent=screenings.reduce((sum,s)=>sum+s.total,0);
+  sTotalEnrolled.textContent=screenings.reduce((sum,s)=>sum+s.enrolled,0);
+  sTotalExcluded.textContent=screenings.reduce((sum,s)=>sum+s.excluded,0);
 
-  const filterDate=document.getElementById('screenDateFilter').value;
-  const rows=screenings.filter(s=>!filterDate||s.date===filterDate).sort((a,b)=>b.date.localeCompare(a.date));
+  const rows=[...screenings].sort((a,b)=>b.date.localeCompare(a.date));
   screenTbody.innerHTML=rows.map(s=>`<tr>
-    <td>${esc(s.date)}</td><td><span class="badge ${s.outcome==='收案'?'ok':'neutral'}">${esc(s.outcome)}</span></td>
-    <td>${esc(s.studyId||'—')}</td><td>${esc(s.ward||'—')}</td><td>${esc(s.note||'—')}</td>
-    <td><div class="actions"><button class="ghost small" onclick="editScreen('${s.id}')">編輯</button><button class="ghost small" onclick="deleteScreen('${s.id}')">刪除</button></div></td>
-  </tr>`).join('')||'<tr><td colspan="6" class="muted">目前沒有篩選記錄</td></tr>';
+    <td>${esc(s.date)}</td><td>${s.total}</td><td>${s.enrolled}</td><td>${s.excluded}</td>
+    <td><div class="actions"><button class="ghost small" onclick="editScreenDay('${s.date}')">編輯</button><button class="ghost small" onclick="deleteScreenDay('${s.date}')">刪除</button></div></td>
+  </tr>`).join('')||'<tr><td colspan="5" class="muted">目前沒有篩選記錄</td></tr>';
 }
-document.getElementById('screenDateFilter').addEventListener('change',renderScreening);
 
 function dateOnly(d){const x=new Date(d);return new Date(x.getFullYear(),x.getMonth(),x.getDate())}
 function daysUntil(s){if(!s)return null;const today=dateOnly(new Date());const target=dateOnly(s+'T00:00:00');return Math.round((target-today)/86400000)}
