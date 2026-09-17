@@ -15,6 +15,7 @@
   h1{font-size:28px;margin:0 0 6px}
   .sub{color:var(--muted);margin-bottom:20px}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+  .grid-4{grid-template-columns:repeat(4,1fr)}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 4px 16px rgba(0,0,0,.04)}
   .metric{font-size:30px;font-weight:700;margin-top:6px}.label{color:var(--muted);font-size:14px}
   .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
@@ -98,26 +99,27 @@
   </div>
 
   <div id="tabScreening" hidden>
-    <div class="grid">
+    <div class="grid grid-4">
       <div class="card"><div class="label">累計篩選總數</div><div class="metric" id="sTotal">0</div></div>
       <div class="card"><div class="label">累計收案</div><div class="metric" id="sTotalEnrolled">0</div></div>
+      <div class="card"><div class="label">累計拒絕</div><div class="metric" id="sTotalDeclined">0</div></div>
       <div class="card"><div class="label">累計排除</div><div class="metric" id="sTotalExcluded">0</div></div>
     </div>
 
     <div class="card">
-      <div class="section-title"><h2>每日篩選數量</h2><span class="muted">同一天再次儲存會直接更新該天的數字</span></div>
+      <div class="section-title"><h2>每日篩選數量</h2><span class="muted">同一天再次儲存會直接更新該天的數字｜排除＝篩選－收案－拒絕，自動計算</span></div>
       <div class="toolbar">
         <label style="max-width:170px">日期<input id="screenDate" type="date"></label>
         <label style="max-width:140px">今日篩選總數<input id="screenTotalInput" type="number" min="0" placeholder="0"></label>
         <label style="max-width:140px">收案人數<input id="screenEnrolledInput" type="number" min="0" placeholder="0"></label>
-        <label style="max-width:140px">排除人數<input id="screenExcludedInput" type="number" min="0" placeholder="0"></label>
+        <label style="max-width:140px">拒絕人數<input id="screenDeclinedInput" type="number" min="0" placeholder="0"></label>
         <button class="primary" onclick="saveScreenDay()">儲存</button>
       </div>
 
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>日期</th><th>篩選總數</th><th>收案</th><th>排除</th><th>操作</th>
+            <th>日期</th><th>篩選總數</th><th>收案</th><th>拒絕</th><th>排除</th><th>操作</th>
           </tr></thead>
           <tbody id="screenTbody"></tbody>
         </table>
@@ -153,6 +155,7 @@ let cases=JSON.parse(localStorage.getItem(KEY)||'[]');
 const caseDialog=document.getElementById('caseDialog');
 const SKEY='discharge_tracker_screening_v1';
 let screenings=JSON.parse(localStorage.getItem(SKEY)||'[]');
+screenings=screenings.map(s=>'declined' in s?s:{...s,declined:0});
 
 function switchTab(name){
   const isTracking=name==='tracking';
@@ -166,30 +169,32 @@ function switchTab(name){
   }
 }
 function saveScreenings(){localStorage.setItem(SKEY,JSON.stringify(screenings));renderScreening()}
+function excludedOf(s){return s.total-s.enrolled-s.declined}
 function saveScreenDay(){
   const date=screenDate.value;
   if(!date){alert('請選擇日期');return}
-  const day={date,total:Number(screenTotalInput.value)||0,enrolled:Number(screenEnrolledInput.value)||0,excluded:Number(screenExcludedInput.value)||0};
+  const day={date,total:Number(screenTotalInput.value)||0,enrolled:Number(screenEnrolledInput.value)||0,declined:Number(screenDeclinedInput.value)||0};
   const existing=screenings.find(x=>x.date===date);
   if(existing){screenings=screenings.map(x=>x.date===date?{...x,...day}:x)}else{screenings.push({id:crypto.randomUUID(),...day})}
   saveScreenings();
-  screenTotalInput.value='';screenEnrolledInput.value='';screenExcludedInput.value='';
+  screenTotalInput.value='';screenEnrolledInput.value='';screenDeclinedInput.value='';
 }
 function editScreenDay(date){
   const s=screenings.find(x=>x.date===date);if(!s)return;
-  screenDate.value=s.date;screenTotalInput.value=s.total;screenEnrolledInput.value=s.enrolled;screenExcludedInput.value=s.excluded;
+  screenDate.value=s.date;screenTotalInput.value=s.total;screenEnrolledInput.value=s.enrolled;screenDeclinedInput.value=s.declined;
 }
 function deleteScreenDay(date){if(confirm('確定刪除 '+date+' 的篩選記錄？')){screenings=screenings.filter(x=>x.date!==date);saveScreenings()}}
 function renderScreening(){
   sTotal.textContent=screenings.reduce((sum,s)=>sum+s.total,0);
   sTotalEnrolled.textContent=screenings.reduce((sum,s)=>sum+s.enrolled,0);
-  sTotalExcluded.textContent=screenings.reduce((sum,s)=>sum+s.excluded,0);
+  sTotalDeclined.textContent=screenings.reduce((sum,s)=>sum+s.declined,0);
+  sTotalExcluded.textContent=screenings.reduce((sum,s)=>sum+excludedOf(s),0);
 
   const rows=[...screenings].sort((a,b)=>b.date.localeCompare(a.date));
   screenTbody.innerHTML=rows.map(s=>`<tr>
-    <td>${esc(s.date)}</td><td>${s.total}</td><td>${s.enrolled}</td><td>${s.excluded}</td>
+    <td>${esc(s.date)}</td><td>${s.total}</td><td>${s.enrolled}</td><td>${s.declined}</td><td>${excludedOf(s)}</td>
     <td><div class="actions"><button class="ghost small" onclick="editScreenDay('${s.date}')">編輯</button><button class="ghost small" onclick="deleteScreenDay('${s.date}')">刪除</button></div></td>
-  </tr>`).join('')||'<tr><td colspan="5" class="muted">目前沒有篩選記錄</td></tr>';
+  </tr>`).join('')||'<tr><td colspan="6" class="muted">目前沒有篩選記錄</td></tr>';
 }
 
 function dateOnly(d){const x=new Date(d);return new Date(x.getFullYear(),x.getMonth(),x.getDate())}
